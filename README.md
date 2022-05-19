@@ -43,3 +43,5 @@ override.tf.json
 terraform.rc
 - Будет игнорироваться файл terraform.rc
 
+This line was added according to the task about creating a new branch with the name "fix".
+
