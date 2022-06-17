@@ -1,129 +1,179 @@
-# Домашнее задание к занятию "3.3. Операционные системы, лекция 1"
+# Домашнее задание к занятию "3.4. Операционные системы, лекция 2"
 
-1. Какой системный вызов делает команда cd?
+1. Cоздайте самостоятельно простой [unit-файл](https://www.freedesktop.org/software/systemd/man/systemd.service.html) для node_exporter:
 
 ```bash
-Команда cd делает системный вызов chdir().
-С помощью команды 
-strace /bin/bash -c 'cd /tmp' 2>&1 | cut -d\( -f1 | sort | uniq -c
-были выведены все виды системных вызовов, которые используются командой cd. 
-Их оказалось 28 видов (некоторые выполнялись многократно), 
-причем один раз использовался системный вызов chdir(). 
-Логично предположить, что именно он является целевым для команды cd.
+Скачиваем и распаковываем файл node_exporter-1.3.1.linux-amd64.tar.gz. 
+В директории /opt создаем поддиректорию /node_exporter, и в нее копируем исполняемый файл node_exporter 
+(или создаем symlink на него).
+С помощью редактора vim в директории /etc/systemd/system/ создаем файл node_exporter.service.
+[root@server /]# systemctl cat node_exporter.service
+# /etc/systemd/system/node_exporter.service
+[Unit]
+Description=Prometheus Node Exporter
+Documentation=https://github.com/prometheus/node_exporter
+After=network-online.target
+
+[Service]
+User=root
+EnvironmentFile=/etc/default/node_exporter
+ExecStart=/opt/node_exporter/node_exporter $OPTIONS
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+----------------------------------
+Помещаем сервис в автозагрузку:
+[root@server ~]# systemctl enable node_exporter.service
+Проверяем, что сервис добавлен в автозагрузку:
+[root@server ~]# systemctl is-enabled node_exporter.service
+enabled
+----------------------------------
+Возможность добавления опций обеспечена строками:
+EnvironmentFile=/etc/default/node_exporter
+ExecStart=/opt/node_exporter/node_exporter $OPTIONS
+в Unit-файле и строкой: 
+OPTIONS=''
+в файле /etc/default/node_exporter.
+----------------------------------
+Проверено, что процесс корректно стартует, завершается, а после перезагрузки автоматически поднимается:
+[root@server ~]# systemctl status node_exporter.service
+● node_exporter.service - Prometheus Node Exporter
+   Loaded: loaded (/etc/systemd/system/node_exporter.service; enabled; vendor preset: disabled)
+   Active: active (running) since Fri 2022-06-17 04:54:38 +03; 53min ago
+     Docs: https://github.com/prometheus/node_exporter
+ Main PID: 35853 (node_exporter)
+    Tasks: 3 (limit: 4844)
+   Memory: 10.9M
+   CGroup: /system.slice/node_exporter.service
+           └─35853 /opt/node_exporter/node_exporter
+
+Jun 17 04:54:38 server node_exporter[35853]: ts=2022-06-17T01:54:38.663Z caller=node_exporter.go:115 level=info collector=thermal_zone
+Jun 17 04:54:38 server node_exporter[35853]: ts=2022-06-17T01:54:38.663Z caller=node_exporter.go:115 level=info collector=time
+Jun 17 04:54:38 server node_exporter[35853]: ts=2022-06-17T01:54:38.663Z caller=node_exporter.go:115 level=info collector=timex
+Jun 17 04:54:38 server node_exporter[35853]: ts=2022-06-17T01:54:38.663Z caller=node_exporter.go:115 level=info collector=udp_queues
+Jun 17 04:54:38 server node_exporter[35853]: ts=2022-06-17T01:54:38.663Z caller=node_exporter.go:115 level=info collector=uname
+Jun 17 04:54:38 server node_exporter[35853]: ts=2022-06-17T01:54:38.663Z caller=node_exporter.go:115 level=info collector=vmstat
+Jun 17 04:54:38 server node_exporter[35853]: ts=2022-06-17T01:54:38.663Z caller=node_exporter.go:115 level=info collector=xfs
+Jun 17 04:54:38 server node_exporter[35853]: ts=2022-06-17T01:54:38.663Z caller=node_exporter.go:115 level=info collector=zfs
+Jun 17 04:54:38 server node_exporter[35853]: ts=2022-06-17T01:54:38.663Z caller=node_exporter.go:199 level=info msg="Listening on" address=:9100
+Jun 17 04:54:38 server node_exporter[35853]: ts=2022-06-17T01:54:38.664Z caller=tls_config.go:195 level=info msg="TLS is disabled." http2=false
+[root@server ~]#
+[root@server ~]# ps aux | grep node
+root         850  0.0  0.0  16892   508 ?        Ss   Jun15   0:00 /usr/sbin/mcelog --ignorenodev --daemon --foreground
+root       35853  0.0  2.2 717632 17952 ?        Ssl  04:54   0:00 /opt/node_exporter/node_exporter
+root       36073  0.0  0.1 221900  1080 pts/0    R+   05:48   0:00 grep --color=auto node
 ```
 
-2. Где находится база данных file на основании которой команда делает свои догадки?
-
+2. Ознакомьтесь с опциями node_exporter и выводом `/metrics` по-умолчанию. Приведите несколько опций, которые вы бы выбрали для базового мониторинга хоста по CPU, памяти, диску и сети.
 ```bash
-В ходе анализа системных вызовов, которые выполняются командой file, 
-было установлено, что таких вызовов 23 вида:
-vagrant@vagrant:~$ strace file /dev/tty 2>&1 1>/dev/null | cut -d\( -f1 | sort | uniq -c | echo $(($(wc -l)-1))
-23
-В ходе анализа каждого из видов системных вызовов, возникло предположение, 
-что обращение к базе данных предусматривает открытие файла системным вызовом openat().
-Системных вызовов openat() оказалось 12 шт, при этом внимание привлекли те, 
-которые ссылаются на файлы /etc/magic.mgc, /etc/magic, /usr/share/misc/magic.mgc.
-Далее путем анализа указанных файлов и встроенной справки установлено, 
-что искомым файлом является /usr/share/misc/magic.mgc, 
-и обращение к нему выполняется системным вызовом:
-openat(AT_FDCWD, "/usr/share/misc/magic.mgc", O_RDONLY) = 3
+Команда вывода всех опций:
+curl -s localhost:9100/metrics
+----------------------------------
+Вывод опций для базового мониторинга хоста по CPU:
+[root@server ~]# curl -s localhost:9100/metrics | grep ^node_cpu_seconds_total
+node_cpu_seconds_total{cpu="0",mode="idle"} 111817.37
+node_cpu_seconds_total{cpu="0",mode="iowait"} 42.09
+node_cpu_seconds_total{cpu="0",mode="irq"} 112.44
+node_cpu_seconds_total{cpu="0",mode="nice"} 29.57
+node_cpu_seconds_total{cpu="0",mode="softirq"} 120.43
+node_cpu_seconds_total{cpu="0",mode="steal"} 0
+node_cpu_seconds_total{cpu="0",mode="system"} 484.07
+node_cpu_seconds_total{cpu="0",mode="user"} 118.16
+----------------------------------
+Вывод опций для базового мониторинга хоста по памяти:
+[root@server ~]# curl -s localhost:9100/metrics | grep ^node_memory_Mem
+node_memory_MemAvailable_bytes 4.99552256e+08
+node_memory_MemFree_bytes 6.8059136e+07
+node_memory_MemTotal_bytes 8.29943808e+08
+----------------------------------
+Вывод опций для базового мониторинга хоста по диску (например sda):
+[root@server ~]# curl -s localhost:9100/metrics | grep '^node_disk_read\|^node_disk_write' | grep sda
+node_disk_read_bytes_total{device="sda"} 2.3663621632e+10
+node_disk_read_time_seconds_total{device="sda"} 168.586
+node_disk_reads_completed_total{device="sda"} 62130
+node_disk_reads_merged_total{device="sda"} 365
+node_disk_write_time_seconds_total{device="sda"} 174.27700000000002
+node_disk_writes_completed_total{device="sda"} 311812
+node_disk_writes_merged_total{device="sda"} 21305
+----------------------------------
+Вывод опций для базового мониторинга хоста по сети (например для интерфейса ens33):
+[root@server ~]# curl -s localhost:9100/metrics | grep '^node_network_receive\|^node_network_transmit' | grep 'bytes\|packets\|errs' | grep ens33
+node_network_receive_bytes_total{device="ens33"} 2.3827334e+07
+node_network_receive_errs_total{device="ens33"} 0
+node_network_receive_packets_total{device="ens33"} 68275
+node_network_transmit_bytes_total{device="ens33"} 1.2927154e+07
+node_network_transmit_errs_total{device="ens33"} 0
+node_network_transmit_packets_total{device="ens33"} 36186
 ```
 
-3. Основываясь на знаниях о перенаправлении потоков предложите способ обнуления открытого удаленного файла (чтобы освободить место на файловой системе).
-
+3. Установите в свою виртуальную машину [Netdata](https://github.com/netdata/netdata). После успешной перезагрузки в браузере *на своем ПК* (не в виртуальной машине) вы должны суметь зайти на `localhost:19999`. Ознакомьтесь с метриками, которые по умолчанию собираются Netdata и с комментариями, которые даны к этим метрикам.
 ```bash
-Был запущен процесс, ежесекундно записывающий дату и время (через stdout) в файл date.out:
-vagrant@vagrant:~$ while true; do date; sleep 1; done >> date.out &
-[1] 15818
-Далее был удален файл date.out,  и вывод команды 'lsof -p 15818' отобразил следующее:
-bash    15818 vagrant    1w   REG  253,0     4416 1048612 /home/vagrant/date.out (deleted)
-Для обнуления удаленного файла была применена команда:
-vagrant@vagrant:~$ echo '' > /proc/15818/fd/1
-И вывод команды 'lsof -p 15818' отобразил следующее:
-bash    15818 vagrant    1w   REG  253,0      161 1048612 /home/vagrant/date.out (deleted)
-То есть столбец SIZE изменил значение 4416 на 161. 
-Таким образом, произошло обнуление, но пока мы выводили результат, 
-данные успели разок записаться, поэтому мы увидели размер 161, а не 0. 
-Соответственно, использована команда echo '' > /proc/15818/fd/1.
+Netdata установлена, проброшен порт 19999.
+Информация с vm-машины:
+root@vagrant:~# lsof -i :19999
+COMMAND PID    USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
+netdata 637 netdata    4u  IPv4  22012      0t0  TCP *:19999 (LISTEN)
+netdata 637 netdata   35u  IPv4  30949      0t0  TCP 10.0.2.15:19999->10.0.2.2:59608 (ESTABLISHED)
+netdata 637 netdata   48u  IPv4  30950      0t0  TCP 10.0.2.15:19999->10.0.2.2:59609 (ESTABLISHED)
+netdata 637 netdata   49u  IPv4  30952      0t0  TCP 10.0.2.15:19999->10.0.2.2:59610 (ESTABLISHED)
+netdata 637 netdata   50u  IPv4  30102      0t0  TCP 10.0.2.15:19999->10.0.2.2:59615 (ESTABLISHED)
+netdata 637 netdata   51u  IPv4  30993      0t0  TCP 10.0.2.15:19999->10.0.2.2:59614 (ESTABLISHED)
+netdata 637 netdata   53u  IPv4  31022      0t0  TCP 10.0.2.15:19999->10.0.2.2:59622 (ESTABLISHED)
+----------------------------------
+Информация с хостовой машины:
+Microsoft Windows [Version 10.0.19044.1766]
+(c) Корпорация Майкрософт (Microsoft Corporation). Все права защищены.
+
+C:\Users\Admin>netstat
+
+Активные подключения
+
+  Имя    Локальный адрес        Внешний адрес          Состояние
+  TCP    127.0.0.1:443          view-localhost:59654   ESTABLISHED
+  TCP    127.0.0.1:2222         view-localhost:59604   ESTABLISHED
+  TCP    127.0.0.1:19999        view-localhost:59608   FIN_WAIT_2
+  TCP    127.0.0.1:19999        view-localhost:59609   FIN_WAIT_2
+  TCP    127.0.0.1:19999        view-localhost:59610   FIN_WAIT_2
+  TCP    127.0.0.1:19999        view-localhost:59614   FIN_WAIT_2
+  TCP    127.0.0.1:19999        view-localhost:59615   FIN_WAIT_2
+  TCP    127.0.0.1:19999        view-localhost:59622   FIN_WAIT_2
+----------------------------------
+```
+![netdata](img/netdata.png)
+
+4. Можно ли по выводу `dmesg` понять, осознает ли ОС, что загружена не на настоящем оборудовании, а на системе виртуализации?
+```bash
+Да, причем даже можно узнать тип гипервизора:
+Вывод для Ubuntu 20.04.3 в программном средстве Vagrant (гипервизор KVM):
+root@vagrant:~# dmesg | grep virt
+[    0.009667] CPU MTRRs all blank - virtualized system.
+[    0.181560] Booting paravirtualized kernel on KVM
+[    3.515111] systemd[1]: Detected virtualization oracle.
+root@vagrant:~#
+----------------------------------
+Вывод для CentOS Linux 8 в VMware Workstation:
+[root@server ~]# dmesg | grep virt
+[    0.000000] Booting paravirtualized kernel on VMware hypervisor
+[    1.443388] systemd[1]: Detected virtualization vmware.
+[    7.156944] systemd[1]: Detected virtualization vmware.
 ```
 
-4. Занимают ли зомби-процессы какие-то ресурсы в ОС (CPU, RAM, IO)?
-
+5. Как настроен sysctl `fs.nr_open` на системе по-умолчанию? Узнайте, что означает этот параметр. Какой другой существующий лимит не позволит достичь такого числа (`ulimit --help`)?
 ```bash
-Зомби-процессы освобождают свои ресурсы в ОС (CPU, RAM, IO), но не освобождают запись в таблице процессов. Соответственно, ресурсы они не занимают. 
-```
-
-5. На какие файлы вы увидели вызовы группы open за первую секунду работы утилиты opensnoop?
-
-```bash
-root@vagrant:~# opensnoop-bpfcc -d 1
-PID    COMM               FD ERR PATH
-18377  date                3   0 /etc/ld.so.cache
-18377  date                3   0 /lib/x86_64-linux-gnu/libc.so.6
-18377  date                3   0 /usr/lib/locale/locale-archive
-18377  date                3   0 /etc/localtime
-18378  sleep               3   0 /etc/ld.so.cache
-18378  sleep               3   0 /lib/x86_64-linux-gnu/libc.so.6
-18378  sleep               3   0 /usr/lib/locale/locale-archive
-18379  date                3   0 /etc/ld.so.cache
+Значение по-умолчанию:
+root@vagrant:~# sysctl -n fs.nr_open
+1048576
+Этот параметр определяет максимальное количество открытых файлов в одном процессе.
+Такого числа не позволит достичь лимит "open files" в "ulimit -a":
+root@vagrant:~# ulimit -n
+1024
 root@vagrant:~#
 ```
 
-6. Какой системный вызов использует uname -a? Приведите цитату из man по этому системному вызову, где описывается альтернативное местоположение в /proc, где можно узнать версию ядра и релиз ОС.
-
+6. Запустите любой долгоживущий процесс в отдельном неймспейсе процессов; покажите, что ваш процесс работает под PID 1 через `nsenter`. Для простоты работайте в данном задании под root (`sudo -i`).
 ```bash
-системный вызов uname()
-Цитата из man uname(2):
-Part of the utsname information is also accessible via 
-/proc/sys/kernel/{ostype, hostname, osrelease, version, domainname}.
 ```
 
-7. Чем отличается последовательность команд через `;` и через `&&` в bash?
-
-```bash
-В последовательности, разделенной символом `;`, 
-команды выполняются друг за другом вне зависимости от успешности выполнения каждой из них, 
-то есть вне зависимости от их кодов возврата.
-В случае использования `&&` последующая команда будет выполняться 
-только в случае успешности выполнения предыдущей,
-то есть при получении от нее кода возврата "0".
-По приведенному примеру можно утверждать, что в файловой системе нет директории /tmp/some_dir,
-поэтому во втором случае команда `echo Hi` и не была выполнена
-```
-Есть ли смысл использовать в bash &&, если применить set -e?
-```bash
-set -e - прерывает bash-сессию при ошибке исполнения команды (при получении кода возврата больше нуля).
-Смысл есть только в том случае, если мы намеренно не хотим прерывать bash-сессию при возникновении ошибки 
-выолнения команды, записанной до `&&` (проверено, сессия действительно не рвется). В иных случаях смысла нет.
-```
-
-8. Из каких опций состоит режим bash set -euxo pipefail и почему его хорошо было бы использовать в сценариях?
-
-```bash
-Описание опций:
--e - прерывает сессию при ошибке исполнения (код возврата больше нуля) любой команды кроме последней в последовательности;
--u - в сессии неустановленные (незаданные) параметры и(или) переменные оболочки считаются как ошибки.
-	Сообщение об ошибке выводится в stderr и выполняется завершение работы сессии в неинтерактивной оболочке.
-	В интерактивной оболочке завершение работы сессии не произойдет;
--x - вывод в stderr "трассировки" для каждой команды;
--o pipefail - демаскирование ошибок в конвейере. В случае ошибки какой-либо команды в конвейере, 
-	её код возврата будет использоваться как код возврата для всего конвейера.
-По сути режим 'set -euxo pipefail' для сценария повышает детализацию вывода ошибок и уровень логирования, 
-и завершит выполнение сценария (на любом этапе) при возникновении различных ошибок.
-Этот режим удобно использовать при разработке и отладке сценария.
-```
-
-9. Используя -o stat для ps, определите, какой наиболее часто встречающийся статус у процессов в системе.
-
-```bash
-Наиболее часто встречающийся статус у процессов в системе:
-S*(S,S+,S<,Sl,SLsl,SN,S<s,Ss,Ss+,Ssl) - Процессы в статусе "Interruptible Sleeping", всего в системе оказалось 65 шт.
-Описания дополнительных символов:
-< - высокий приоритет (низкий nice);
-N - низкий приоритет (высокий nice);
-L - имеет заблокированные в памяти страницы;
-s - лидер сессии;
-l - многопоточный процесс;
-+ - процесс в foreground-режиме (связан с терминалом).
-```
 
