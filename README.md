@@ -165,15 +165,82 @@ root@vagrant:~#
 Значение по-умолчанию:
 root@vagrant:~# sysctl -n fs.nr_open
 1048576
-Этот параметр определяет максимальное количество открытых файлов в одном процессе.
+Этот параметр определяет максимальное количество открытых файлов в процессе.
 Такого числа не позволит достичь лимит "open files" в "ulimit -a":
+root@vagrant:~# ulimit -a
+core file size          (blocks, -c) 0
+data seg size           (kbytes, -d) unlimited
+scheduling priority             (-e) 0
+file size               (blocks, -f) unlimited
+pending signals                 (-i) 3571
+max locked memory       (kbytes, -l) 65536
+max memory size         (kbytes, -m) unlimited
+open files                      (-n) 1024
+pipe size            (512 bytes, -p) 8
+POSIX message queues     (bytes, -q) 819200
+real-time priority              (-r) 0
+stack size              (kbytes, -s) 8192
+cpu time               (seconds, -t) unlimited
+max user processes              (-u) 3571
+virtual memory          (kbytes, -v) unlimited
+file locks                      (-x) unlimited
+----------------------------------
+Или 'ulimit -n':
 root@vagrant:~# ulimit -n
 1024
 root@vagrant:~#
 ```
 
-6. Запустите любой долгоживущий процесс в отдельном неймспейсе процессов; покажите, что ваш процесс работает под PID 1 через `nsenter`. Для простоты работайте в данном задании под root (`sudo -i`).
+6. Запустите любой долгоживущий процесс (не ls, который отработает мгновенно, а, например, sleep 1h) в отдельном неймспейсе процессов; покажите, что ваш процесс работает под PID 1 через nsenter. Для простоты работайте в данном задании под root (sudo -i). Под обычным пользователем требуются дополнительные опции (--map-root-user) и т.д.
 ```bash
+1. Запускаем процесс sleep 1000 в background-режиме 
+в отдельном pid-namespace с ответствлением (--fork) и перемонтированием procfs (--mount-proc)
+root@vagrant:~#
+root@vagrant:~# unshare --pid --fork --mount-proc sleep 1000 &
+[1] 3002
+root@vagrant:~#
+2. Видим, что процесс unshare создан с PID=3002 (в основном namespace).
+Проверяем текущие процессы, привязанные к терминалам:
+root@vagrant:~# ps a
+    PID TTY      STAT   TIME COMMAND
+    674 tty1     Ss+    0:00 /sbin/agetty -o -p -- \u --noclear tty1 linux
+   2729 pts/1    Ss     0:00 -bash
+   2789 pts/1    S      0:00 sudo -i
+   2791 pts/1    S      0:00 -bash
+   2881 pts/0    Ss     0:00 -bash
+   2908 pts/0    S      0:00 sudo -i
+   2909 pts/0    S+     0:00 -bash
+   3002 pts/1    S      0:00 unshare --pid --fork --mount-proc sleep 1000
+   3003 pts/1    S      0:00 sleep 1000
+   3004 pts/1    R+     0:00 ps a
+3. Видим, что запущенный процесс sleep создан с PID=3003 (в основном namespace).
+Проверяем, есть ли у него еще PID'ы в других namespace'ах, и видим 1-цу (т.е. PID=1)
+root@vagrant:~# cat /proc/3003/status | grep -i nspid
+NSpid:  3003    1
+4. Переключаемся в изолированный namespace по PID=3003 и убеждаемся (через 'ps a'), 
+что в нём наш процесс sleep работает с PID=1
+root@vagrant:~# nsenter --target 3003 --pid --mount
+root@vagrant:/# ps a
+    PID TTY      STAT   TIME COMMAND
+      1 pts/1    S      0:00 sleep 1000
+      2 pts/1    S      0:00 -bash
+     13 pts/1    R+     0:00 ps a
+root@vagrant:/#
 ```
 
+7. Найдите информацию о том, что такое :(){ :|:& };:. Запустите эту команду в своей виртуальной машине Vagrant с Ubuntu 20.04. Некоторое время все будет "плохо", после чего (минуты) – ОС должна стабилизироваться. Вызов dmesg расскажет, какой механизм помог автоматической стабилизации. Как настроен этот механизм по-умолчанию, и как изменить число процессов, которое можно создать в сессии?
+```bash
+Конструкция :(){ :|:& };: является так называемой 'fork-бомбой'. Это функция, которая параллельно запускает два своих экземпляра. 
+Каждый экземпляр запускает ещё по два и т.д. При отсутствии лимита на число процессов машина исчерпывает физическую память и уходит в своп. 
+На виртуальной машине Vagrant с Ubuntu 20.04 лимит на число процессов был установлен.
+root@vagrant:/proc# ulimit -u
+3571
+Соответственно автоматической стабилизации видимо помог механизм (из dmesg):
+[15304.566111] cgroup: fork rejected by pids controller in /user.slice/user-1000.slice/session-16.scope
+По умолчанию число процессов было задано 3571. 
+Можно изменить с помощью ulimit:
+root@vagrant:/proc# ulimit -u 4000
+root@vagrant:/proc# ulimit -u
+4000
+```
 
