@@ -1,0 +1,4 @@
+---
+vector_version: "0.25.1"
+vector_packages:
+  - vector
