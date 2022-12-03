@@ -1,0 +1,5 @@
+---
+necessary_packages:
+  - epel-release
+  - unzip
+  - nginx

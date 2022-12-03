@@ -1,0 +1,25 @@
+---
+# Clickhouse
+- name: Install Clickhouse
+  tags: clickhouse
+  hosts: clickhouse-01
+  roles:
+    - clickhouse
+# Vector
+- name: Install Vector
+  tags: vector
+  hosts: vector-01
+  roles:
+    - vector-role
+# Lighthouse
+- name: Install Lighthouse
+  tags: lighthouse
+  hosts: lighthouse-01
+  pre_tasks:
+    - name: Install required packages
+      become: true
+      ansible.builtin.yum:
+        name: "{{ item }}"
+      with_items: "{{ necessary_packages }}"
+  roles:  
+    - lighthouse-role
