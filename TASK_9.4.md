@@ -126,13 +126,37 @@ jenkins-master-01          : ok=11   changed=9    unreachable=0    failed=0    s
 
 ### Выполнение основной части
 
-Сделана Freestyle Job, которая запускает `molecule test` из репозитория:
-https://github.com/evgeni-listopad/devops-netology.git
+* Сделана Freestyle Job, которая запускает `molecule test` из репозитория:
+https://github.com/evgeni-listopad/vector-role
 
 Применены следующие Bash-команды:
 
-[Jenkins_Freestyle_Job](./TASK_9.4/Jenkins_master_2.JPG)
+[Jenkins_Freestyle_Job](./TASK_9.4/Jenkins_master_4.JPG)
 
-Остальные пункты еще в работе.
-Прошу отправить на доработку.
+Запуск `molecule test` выполнен успешно:
+
+[Jenkins_Freestyle_Job_result](./TASK_9.4/Jenkins_master_3.JPG)
+
+* Сделана Declarative Pipeline Job. Обеспечена корректная ее работа при выполнении `molecule test`:
+
+[Jenkins_Declarative_Job_result](./TASK_9.4/Jenkins_master_5.JPG)
+
+* Содержимое Pipeline-скрипта перенесено в файл [Jenkinsfile](./TASK_9.4/Jenkinsfile)
+
+* Создан Multibranch Pipeline на запуск `Jenkinsfile` из репозитория:
+
+[Jenkins_Multibranch_Job_result](./TASK_9.4/Jenkins_master_6.JPG)
+
+* Создан Scripted Pipeline и наполнен скриптом из задания.
+
+[Jenkins_Scripted_Job](./TASK_9.4/Jenkins_master_8.JPG)
+
+* Внесены изменения в pipeline в соотвествии с заданием, исправленный Pipeline вложен в репозиторий в файл [ScriptedJenkinsfile](./TASK_9.4/ScriptedJenkinsfile)
+
+* Ссылки:
+* [Репозиторий с ролью](https://github.com/evgeni-listopad/vector-role), на которой тестировались запуски `molecule test`.
+* [Declarative Pipeline](./TASK_9.4/Jenkinsfile)
+* [Scripted Pipeline](./TASK_9.4/ScriptedJenkinsfile)
+
+
 

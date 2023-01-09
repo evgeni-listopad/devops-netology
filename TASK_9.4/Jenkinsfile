@@ -1,0 +1,26 @@
+pipeline{
+    agent any
+    stages{
+        stage('Clear previous step'){
+            steps{
+                sh 'rm -rf /opt/jenkins_agent/workspace/Freestyle Job/devops-netology'
+            }
+        }
+        stage('Git clone repository'){
+            steps{
+                sh 'git clone https://github.com/evgeni-listopad/vector-role.git'
+            }
+        }
+        stage('Remove unneeded requirement'){
+            steps{
+                sh 'sed -i "/yamllint/d" vector-role/molecule/default/molecule.yml'
+                sh 'sed -i "/ansible-lint/d" vector-role/molecule/default/molecule.yml'
+            }
+        }
+        stage('Run molecule test'){
+            steps{
+                sh 'cd vector-role && molecule test'
+            }
+        }
+    }
+}
