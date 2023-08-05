@@ -1,0 +1,27 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-4
+  labels:
+    app: deployment-4
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: deployment-4
+  template:
+    metadata:
+      labels:
+        app: deployment-4
+    spec:
+      containers:
+        - name: nginx
+          image: nginx
+          volumeMounts:
+            - name: volume-2
+              mountPath: /usr/share/nginx/html/
+      volumes:
+        - name: volume-2
+          configMap:
+            name: configmap-3
